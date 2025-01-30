@@ -103,14 +103,5 @@ All variables were transformed into **natural logarithms** for consistency and e
 🔹 [Anfavea: State EV Fleet](https://anfavea.com.br/en/site/anuarios/)  
 🔹 [Mendeley: Brazilian Panel Data](https://data.mendeley.com/datasets/hzpwbp7j22/1)  
 
----
-
-📌 **Authors:**  
-👤 **Beatriz Monteiro** - 20240591  
-👤 **Jorge Cordeiro** - 20240594  
-👤 **Pedro Santos** - 20240295  
-👤 **Rodrigo Miranda** - 20240490  
-
-🚀 **This project applies advanced econometric techniques to analyze gasoline demand in Brazil!** 🚀  
 
 
