@@ -1,0 +1,296 @@
+---
+title: "Gasoline Demand Analysis in Brazil"
+author:
+  - name: "Beatriz Monteiro - 20240591"
+  - name: "Jorge Cordeiro - 20240594"
+  - name: "Pedro Santos - 20240295"
+  - name: "Rodrigo Miranda - 20240490"
+affil: "Nova Information Management School"
+column_numbers: 3
+output: 
+  posterdown::posterdown_html:
+    self_contained: false
+fontsize: 12pt
+---
+
+```{css, echo=FALSE}
+div.title_container {
+   background-color: #357EC7;
+}
+
+div.title_container h1 {
+   color: white; 
+   font-size: 140px;
+   margin-bottom: 10px;
+}
+
+div.title_container h3 {
+   margin-top: 40px;
+   color: white;
+   font-size: 70px;
+   line-height: 1.6;
+   margin: 0;
+}
+
+div.logo_left {
+  background-color: #357EC7;
+}
+
+div.logo_right {
+  background-color: #357EC7;
+}
+
+.poster_body h1 {
+  background-color: #357EC7;
+  color: #FFFFFF;
+  padding: 10px; 
+  border-radius: 5px;
+  text-align: center;
+  margin-bottom: 20px;
+  font-weight: bold;
+  border: 2px solid #FFFFFF;
+  font-size: 50px; 
+}
+
+.poster_body h3 {
+  font-size: 43px;
+}
+
+p {
+  font-size: 43px;
+}
+
+```
+
+
+# **Introduction**
+
+This study focuses on analyzing the gasoline demand in Brazil using panel data from 27 Brazilian states over 16 years. The variables include gasoline sales per capita, current fuel prices, ethanol prices, conventional and electric motorization rates, and GDP per capita, all transformed into natural logarithms for consistency and ease of interpretation.
+
+---
+
+# **Key Questions**
+**1.** How do fuel prices influence gasoline demand in Brazil?
+
+**2.** What role do ethanol prices play in shaping traditional fuel consumption?
+
+**3.** How do income levels affect the elasticity of gasoline demand across different regions?
+
+---
+
+# **Methodology**
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+# libraries needed
+library(knitr)
+library(car)
+library(plm)
+library(lmtest)
+library(ggplot2)
+library(dplyr)
+library(broom)
+library(kableExtra)
+library(sandwich)
+library(tidyr)
+
+
+#data import
+setwd("C:/Users/rodri/Desktop/Projeto Estatística/Group")
+brasil_gas <- read.csv("dataset.csv", header=TRUE, sep=';')
+```
+
+### **Model Specification**
+
+Let \( ln\_Sg\_pc_{it} \) represent the logarithm of gasoline sales per capita for state \( i \) at time \( t \). The general equation is:
+
+\[
+ln\_Sg\_pc_{it} = \beta_0 + \beta_1ln\_Pg_{it} + \beta_2ln\_Pe_{it} + \beta_3ln\_Mi\_c_{it} + \\
+\beta_4ln\_Mi\_e_{it} + \beta_5ln\_gdp\_pc_{it} + \epsilon_{it}
+\]
+
+::: {.column width="100%"}
+
+- \( ln\_Pg_{it} \): Logarithm of current fuel (gasoline) prices.
+
+- \( ln\_Pe_{it} \): Logarithm of current ethanol prices.
+
+- \( ln\_Mi\_c_{it} \): Logarithm of conventional motorization rates (vehicles with combustion engines).
+
+- \( ln\_Mi\_e_{it} \): Logarithm of electric motorization rates (proportion of electric vehicles in circulation).
+
+- \( ln\_gdp\_pc_{it} \): Logarithm of GDP per capita.
+
+- \( \epsilon_{it} \): Error term.
+:::
+ 
+---              
+
+### **1. Multicollinearity Check**
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.height=6, fig.width=8}
+
+vif_result <- vif(lm(ln_Sg_pc ~ ln_Pg + ln_Pe + ln_Mi_c + ln_Mi_e + ln_gdp_pc, 
+                     data = brasil_gas))
+
+vif_df <- data.frame(
+  Variable = names(vif_result),
+  VIF = as.numeric(vif_result)
+)
+
+library(ggplot2)
+ggplot(vif_df, aes(x = reorder(Variable, VIF), y = VIF)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_hline(yintercept = 5, linetype = "dashed", color = "red", size = 0.8) +
+  theme_minimal() +
+  labs(
+    title = "Variance Inflation Factor (VIF)",
+    x = "Variable",
+    y = "VIF Value"
+  ) +
+  theme(
+    axis.text.x = element_text(size = 14, angle = 45, hjust = 1), 
+    axis.text.y = element_text(size = 14), 
+    axis.title.x = element_text(size = 16, face = "bold"), 
+    axis.title.y = element_text(size = 16, face = "bold"), 
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5) 
+  )
+```
+
+We set our treshold to 5 and as we see none of the variables present a VIF higher than that. We conclude there is no multicolinearity in our model.
+
+---
+
+### **2. Panel Data Models**
+
+To estimate the effects of fuel prices, ethanol prices and income levels on gasoline demand, we considered three types of panel data models: **Pooled OLS Model**, **Fixed Effects Model**, **Random Effects Model**.
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+model_pooled <- plm(ln_Sg_pc ~ ln_Pg + ln_Pe + ln_Mi_c + ln_Mi_e + ln_gdp_pc,
+                    data = brasil_gas,
+                    model = "pooling")
+
+model_fixed <- plm(ln_Sg_pc ~ ln_Pg + ln_Pe + ln_Mi_c + ln_Mi_e + ln_gdp_pc,
+                   data = brasil_gas, model = "within")
+
+model_random <- plm(ln_Sg_pc ~ ln_Pg + ln_Pe + ln_Mi_c + ln_Mi_e + ln_gdp_pc,
+                    data = brasil_gas, model = "random")
+     
+```
+
+---
+
+### **3 Heteroskedasticity Assessment: Breusch-Pagan Test**
+
+```{r heterocedaskicity, echo=FALSE, warning=FALSE, message=FALSE}
+
+# tests
+bp_pooled <- bptest(model_pooled)
+bp_fixed <- bptest(model_fixed)
+bp_random <- bptest(model_random)
+
+# df creation
+heterosk_results <- data.frame(
+  Test = c("Breusch Pagan (Pooled OLS)", "Breusch Pagan (Fixed Effects)", "Breusch Pagan (Random Effects)"),
+  P_Value = c(as.numeric(bp_pooled$p.value), as.numeric(bp_fixed$p.value), as.numeric(bp_random$p.value)),
+  H0 = c("Homoskedasticity", "Homoskedasticity", "Homoskedasticity"),
+  Conclusion = ifelse(c(bp_pooled$p.value, bp_fixed$p.value, bp_random$p.value) < 0.05, "Heteroskedasticity", "Homoskedasticity")
+)
+
+#ploting table
+kable(heterosk_results, caption = "Heteroskedasticity Test Results", align = "c")
+
+```
+
+The results of the Breusch-Pagan test indicate the presence of heteroscedasticity (\(p-value = 0\)) across all models. This violates the assumption of homoscedasticity and suggests that robust standard error adjustments are necessary to ensure reliable inference and avoid biased statistical conclusions.
+
+---
+
+### **4. Model Selection: Hausman Test**
+
+```{r hausman-test, echo=FALSE, warning=FALSE, message=FALSE}
+hausman_test <- phtest(model_fixed, model_random)
+
+# df creation
+hausman_results <- data.frame(
+  Test = "Hausman Test",
+  Statistic = as.numeric(hausman_test$statistic),
+  Parameter = as.character(hausman_test$parameter),
+  P_Value = as.numeric(hausman_test$p.value)
+)
+
+# ploting table
+kable(hausman_results, caption = "Hausman Test Results")
+```
+The Hausman Test results (\( \chi^2 = 16.34 \), \( p-value = 0.0059 \)) indicate that the null hypothesis of no correlation between individual effects and explanatory variables is rejected. This suggests that the Fixed Effects model is more appropriate than the Random Effects model for this analysis, as it provides consistent estimates by accounting for unobserved heterogeneity across states.
+
+Given the conclusions from the diagnostic tests, the Fixed Effects model with robust standard errors will be used for the analysis. This approach ensures consistent estimates by accounting for unobserved heterogeneity and addresses potential issues arising from heteroscedasticity, providing a more reliable framework for inference.
+
+---
+
+### **5. Robust Fixed Effects Analysis**
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+fe_robust <- coeftest(model_fixed, vcov = vcovHC(model_fixed, type = "HC0", cluster = "group"))
+
+fe_robust_table <- data.frame(
+  Variable = rownames(fe_robust),
+  Estimate = fe_robust[, "Estimate"],
+  `Std. Error` = fe_robust[, "Std. Error"],
+  `P-Value` = fe_robust[, "Pr(>|t|)"]
+)
+
+rownames(fe_robust_table) <- NULL
+
+kable(fe_robust_table, format = "html", caption = "Robust Fixed Effects Model Results") %>%
+  kable_styling(full_width = FALSE, position = "center", bootstrap_options = c("striped", "hover", "condensed"))
+
+
+```
+
+
+The Adjusted R-squared value for the Fixed Effects model is **`r round(summary(model_fixed)$r.squared["rsq"], 4)`**.
+This metric remains valid with robust standard errors, as they do not alter residuals or fitted values. It reflects how well the explanatory variables explain variations in gasoline demand.
+
+- **Fuel Prices (\( ln\_Pg \))**: Strong negative effect (\( \beta = -1.3856, p < 0.001 \)), indicating higher prices reduce gasoline demand.
+
+- **Ethanol Prices (\( ln\_Pe \))**: Positive and significant (\( \beta = 0.9992, p < 0.001 \)), suggesting that higher ethanol prices may drive consumers toward gasoline consumption.
+
+- **Conventional Motorization (\( ln\_Mi\_c \))**: Significant positive impact (\( \beta = 0.7451, p < 0.001 \)), reflecting the influence of traditional vehicle ownership.
+
+- **Electric Motorization (\( ln\_Mi\_e \))**: Minor negative effect (\( \beta = -0.0354, p < 0.001 \)), suggesting EV adoption slightly reduces gasoline demand.
+
+- **GDP per Capita (\( ln\_gdp\_pc \))**: Not significant (\( p = 0.167 \)), indicating limited influence on gasoline demand after accounting for other variables.
+
+---
+
+# **Conclusion**
+
+The analysis provides clear insights into the determinants of gasoline demand in Brazil:
+
+1. **Fuel prices** emerge as a critical factor, with higher prices effectively reducing gasoline consumption. This highlights the potential for pricing policies to manage demand and encourage fuel efficiency.
+
+2. **Ethanol prices** positively and significantly influence gasoline consumption, suggesting substitution effects between fuel types. Policymakers should consider the interplay between fuel markets when designing energy policies.
+
+3. **Income levels** (measured as GDP per capita) play a negligible role, with no significant effect on gasoline demand after controlling for other variables. This suggests that gasoline consumption is more directly tied to vehicle ownership and fuel prices.
+
+Future work should explore the impact of evolving electric vehicle adoption on gasoline demand, household-level data to better capture behavioral drivers and regional differences in substitution effects between fuels.
+
+
+
+# **References**
+
+[1] ANP. (n.d.). Fuel prices and sales. International Monetary Fund. Available at: [https://www.gov.br/anp/en/access-information/what-is-anp/what-is-anp](https://www.gov.br/anp/en/access-information/what-is-anp/what-is-anp)
+
+[2] IBGE. (n.d.). State population, GDP, and vehicle fleet. Available at: [https://www.ibge.gov.br/en/home-eng.html?lang=en-GB](https://www.ibge.gov.br/en/home-eng.html?lang=en-GB)
+
+[3] Anfavea. (n.d.). State EV fleet. Available at: [https://anfavea.com.br/en/site/anuarios/](https://anfavea.com.br/en/site/anuarios/)
+
+[4] Cavalcante, P.R.N., et al. (2021). Brazilian State Panel Data on Gasoline Demand. Mendeley Data. Available at: [https://data.mendeley.com/datasets/hzpwbp7j22/1](https://data.mendeley.com/datasets/hzpwbp7j22/1)
+
+
+
+
